@@ -1,0 +1,16 @@
+syntax = "proto3";
+package user;
+option go_package = "gRPC/user";
+
+message UserRequest {
+  string body = 1;
+}
+
+message UserResponse {
+  string body = 1;
+}
+
+service UserService {
+  rpc addUser(UserRequest) returns (UserResponse) {}
+  rpc listUsers(UserRequest) returns (UserResponse) {}
+}
