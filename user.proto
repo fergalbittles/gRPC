@@ -2,15 +2,29 @@ syntax = "proto3";
 package user;
 option go_package = "gRPC/user";
 
-message UserRequest {
-  string body = 1;
+message User {
+	int64 ID = 1;
+	string firstName = 2;
+	string lastName = 3;
+	string userName = 4;
+	string password = 5;
 }
 
-message UserResponse {
-  string body = 1;
+message UserCreateRequest {
+  User user = 1;
+}
+
+message UserCreateResponse {
+  User user = 1;
+}
+
+message UserListRequest { }
+
+message UserListResponse {
+  repeated User users = 1;
 }
 
 service UserService {
-  rpc addUser(UserRequest) returns (UserResponse) {}
-  rpc listUsers(UserRequest) returns (UserResponse) {}
+  rpc addUser(UserCreateRequest) returns (UserCreateResponse) {}
+  rpc listUsers(UserListRequest) returns (UserListResponse) {}
 }

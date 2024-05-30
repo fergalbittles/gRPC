@@ -1,49 +1,44 @@
 package user
 
 import (
-	"grpc/globals"
 	"log"
-	"strconv"
-	"strings"
+
+	"github.com/fergalbittles/grpc/globals"
 
 	"golang.org/x/net/context"
 )
 
-type Server struct{}
-
-func (s *Server) AddUser(ctx context.Context, request *UserRequest) (*UserResponse, error) {
-	log.Printf("| Received request from user: %s", request.Body)
-
-	userDetails := strings.Split(request.Body, "|")
-	newUser := globals.User{
-		ID:        globals.UseNextID(),
-		FirstName: userDetails[0],
-		LastName:  userDetails[1],
-		UserName:  userDetails[2],
-		Password:  userDetails[3],
-	}
-	globals.AllUsers = append(globals.AllUsers, newUser)
-
-	if newUser.LastName == "N/A" {
-		res := "Confirmed: \"" + newUser.FirstName + "\" has been added to the system"
-		return &UserResponse{Body: res}, nil
-	}
-
-	res := "Confirmed: \"" + newUser.FirstName + " " + newUser.LastName + "\" has been added to the system"
-	return &UserResponse{Body: res}, nil
+type Server struct {
+	UnimplementedUserServiceServer
 }
 
-func (s *Server) ListUsers(ctx context.Context, request *UserRequest) (*UserResponse, error) {
-	log.Printf("| Received request from user: %s", request.Body)
+func (s *Server) AddUser(ctx context.Context, request *UserCreateRequest) (*UserCreateResponse, error) {
+	log.Printf("| Received request from user: %s", request.User)
 
-	var res string
-	for _, user := range globals.AllUsers {
-		res += "\nID: " + strconv.Itoa(user.ID) + "\n"
-		res += "First Name: " + user.FirstName + "\n"
-		res += "Last Name: " + user.LastName + "\n"
-		res += "Username: " + user.UserName + "\n"
-		res += "Password: " + user.Password[0:1] + "****" + "\n"
+	newUser := globals.User{
+		FirstName: request.User.FirstName,
+		LastName:  request.User.LastName,
+		UserName:  request.User.UserName,
+		Password:  request.User.Password,
+	}
+	globals.AppendUsers(newUser)
+
+	return &UserCreateResponse{User: request.User}, nil
+}
+
+func (s *Server) ListUsers(ctx context.Context, request *UserListRequest) (*UserListResponse, error) {
+	users := globals.ListUsers()
+
+	uu := make([]*User, len(users))
+	for i, user := range users {
+		uu[i] = &User{
+			ID:        user.ID,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			UserName:  user.UserName,
+			Password:  user.Password,
+		}
 	}
 
-	return &UserResponse{Body: res}, nil
+	return &UserListResponse{Users: uu}, nil
 }

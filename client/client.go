@@ -2,21 +2,30 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"fmt"
-	"grpc/user"
 	"log"
 	"os"
 	"strings"
+	"syscall"
 
+	"github.com/fergalbittles/grpc/user"
+
+	"golang.org/x/term"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
 	fmt.Println("Attempting to connect to server...")
 
 	var conn *grpc.ClientConn
-	conn, err := grpc.Dial(":4000", grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.Dial(
+		":4000",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
 	if err != nil {
 		log.Fatalf("| Could not connect: %s", err)
 	}
@@ -65,80 +74,73 @@ func addUser(u user.UserServiceClient) {
 	fmt.Println("\nAdd User")
 	fmt.Println("++++++++")
 
-	// Get the name
-	fmt.Print("Enter your full name: ")
 	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Scan()
-	input1 := strings.TrimSpace(scanner.Text())
+
+	prompt := func(prompt string) string {
+		fmt.Print(prompt)
+		scanner.Scan()
+		return strings.TrimSpace(scanner.Text())
+	}
+
+	getpasswd := func() (string, error) {
+		fmt.Print("Choose your password: ")
+		passwd, err := term.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			return "", err
+		}
+		return string(passwd), nil
+	}
+
+	// Get the name
+	fullName := prompt("Enter your full name: ")
 
 	// Store the name
-	var firstName string
-	var lastName string
-	fullName := strings.Split(input1, " ")
-
-	if len(fullName) == 1 {
-		if fullName[0] == "" {
-			fmt.Println("\nFailure to add user: Must enter a name")
-			return
-		}
-		firstName = fullName[0]
-		lastName = "N/A"
-	} else if len(fullName) > 1 {
-		firstName = fullName[0]
-		lastName = strings.Join(fullName[1:], " ")
+	var (
+		parts     = strings.SplitN(fullName, " ", 2)
+		firstName = parts[0]
+		lastName  string
+	)
+	if len(parts) > 1 {
+		lastName = parts[1]
 	}
 
 	// Get the username
-	fmt.Print("Choose your username: ")
-	scanner.Scan()
-	username := strings.TrimSpace(scanner.Text())
+	username := cmp.Or(prompt("Choose your username: "), firstName)
 	if username == "" {
 		username = firstName
 	}
 
 	// Get the password
-	fmt.Print("Choose your password: ")
-	scanner.Scan()
-	password := strings.TrimSpace(scanner.Text())
-	if password == "" {
-		password = "password"
+	password, err := getpasswd()
+	if err != nil {
+		log.Fatalf("| Error when getting password: %s\n\n", err)
 	}
 
-	// Send the request
-	req := firstName + "|" + lastName + "|" + username + "|" + password
-	if strings.Count(req, "|") > 3 {
-		fmt.Println("\nFailure to add user: Cannot use \"|\" character")
-		return
-	}
-	request := user.UserRequest{
-		Body: req,
-	}
-
-	response, err := u.AddUser(context.Background(), &request)
+	response, err := u.AddUser(context.Background(), &user.UserCreateRequest{
+		User: &user.User{
+			FirstName: firstName,
+			LastName:  lastName,
+			UserName:  username,
+			Password:  password,
+		},
+	})
 	if err != nil {
 		log.Fatalf("| Error when calling AddUser: %s\n\n", err)
 	}
 
-	fmt.Printf("\n%s\n", response.Body)
+	fmt.Printf("\n%s\n", response.User)
 }
 
 func listUsers(u user.UserServiceClient) {
 	fmt.Println("\nList Users")
 	fmt.Println("++++++++++")
 
-	request := user.UserRequest{
-		Body: "List all of the users",
-	}
-
-	response, err := u.ListUsers(context.Background(), &request)
+	response, err := u.ListUsers(context.Background(), &user.UserListRequest{})
 	if err != nil {
 		log.Fatalf("| Error when calling ListUsers: %s\n\n", err)
 	}
 
-	if response.Body == "" {
-		fmt.Println("There are no users stored on the system")
-		return
+	for _, user := range response.Users {
+		fmt.Println(user)
 	}
-
-	fmt.Print(response.Body)
 }

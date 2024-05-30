@@ -1,9 +1,10 @@
 package main
 
 import (
-	"grpc/user"
 	"log"
 	"net"
+
+	"github.com/fergalbittles/grpc/user"
 
 	"google.golang.org/grpc"
 )
